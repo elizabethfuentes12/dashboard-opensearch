@@ -15,21 +15,50 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-import yaml
 import os
 
 # Obtener el directorio actual
 directorio_actual = os.getcwd()
 file = f"{directorio_actual}/dashboard/template.txt"
 
+#create the pipeline configuration
+def generate_template(file, replace_value):
+    """
+                Function that reads a text file, replaces values according to a dictionary
+                of replacements, and returns the updated content as a string.
+
+                Args:
+                    ruta_archivo (str): The path of the text file.
+                    reemplazos (dict): A dictionary where the keys are the values to be
+                                    replaced and the values are the new values.
+
+                Returns:
+                    str: The content of the file with the replaced values.
+        """
+    try:
+        with open(file, 'r') as archivo:
+            contenido = archivo.read()
+                    
+            for clave, valor in replace_value.items():
+                contenido = contenido.replace(clave, valor)
+            return contenido
+
+    except FileNotFoundError:
+        print(f"El archivo {file} no existe.")
+        return None
+    except IOError:
+        print(f"Error al leer el archivo {file}.")
+        return None
+    
+
+        
 
 class DashboardStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         REGION_NAME = self.region
-
-
+        
         # create a cognito pool for opensearch 
         cognito_pool = cognito.UserPool(self, "CognitoUserPool",
                                     sign_in_aliases=cognito.SignInAliases(
@@ -71,8 +100,9 @@ class DashboardStack(Stack):
         #Sets the deletion policy of the resource based on the removal policy DESTROY
         cognito_identity_pool.apply_removal_policy(RemovalPolicy.DESTROY)
 
-        # Use the ref attribute to get the identity pool ID
         identity_pool_id = cognito_identity_pool.ref
+
+        
 
         auth_role = iam.Role(self, "authRoleIdentity", 
             assumed_by = iam.FederatedPrincipal(
@@ -100,6 +130,16 @@ class DashboardStack(Stack):
         # Add the required permissions to the access role
         auth_role.add_to_policy(auth_policy)
 
+        # Use the ref attribute to get the identity pool ID
+        
+        cognito_user_pool_id = cognito_pool.user_pool_id
+        auth_role_arn = auth_role.role_arn
+       
+
+        #identity_pool_id = "us-west-2:3643d964-638e-49f4-90b1-7fb5b12a7bf7"
+        #cognito_user_pool_id = "us-west-2_UIly67Gb8"
+        #auth_role_arn = "arn:aws:iam::637423526459:role/amplify-wabamanager-staging-144653-authRole"
+
         # Crea un rol de IAM para acceder al dominio de OpenSearch
         
         access_role = iam.Role(self, "OpenSearchAccessRoleZeroETL",
@@ -125,11 +165,11 @@ class DashboardStack(Stack):
         # Add the required permissions to the access role
         access_role.add_to_policy(access_policy)
         
-      
+     
         #create a Role with access to the opensearch domain, assume that has the necessary permissions to DynamoDB, OpenSearch, and S3. This role should have a trust relationship with osis-pipelines.amazonaws.com and opensearchservice.amazonaws.com
         sts_role = iam.Role(self, "OpenSearchIngestionRoleZeroETL",
                    assumed_by=iam.CompositePrincipal(
-                       iam.ServicePrincipal("lambda.amazonaws.com"),
+                       iam.ServicePrincipal("osis-pipelines.amazonaws.com"),
                        iam.ServicePrincipal("opensearchservice.amazonaws.com")
                    ),
                    managed_policies=[
@@ -139,7 +179,6 @@ class DashboardStack(Stack):
                        iam.ManagedPolicy.from_aws_managed_policy_name("AmazonOpenSearchIngestionFullAccess")
                    ]
                    )
-
 
         # Importar una VPC existente por su ID
           #vpc_id = "vpc-xxx"  # Reemplaza con el ID de tu VPC existente
@@ -166,7 +205,7 @@ class DashboardStack(Stack):
                                      #vpc_subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE)],
                                    
                                    cognito_dashboards_auth=opensearch.CognitoOptions(
-                                           user_pool_id=cognito_pool.user_pool_id,
+                                           user_pool_id= cognito_user_pool_id,
                                             identity_pool_id=identity_pool_id,
                                             role=access_role
                                         ),  
@@ -178,13 +217,14 @@ class DashboardStack(Stack):
             iam.PolicyStatement(
                 actions=["es:*"],
                 effect=iam.Effect.ALLOW,
-                principals=[iam.AccountPrincipal(self.account), iam.ArnPrincipal(auth_role.role_arn)],
+                principals=[iam.AccountPrincipal(self.account), iam.ArnPrincipal(auth_role_arn)],
                 resources=[f"{opensearch_domain.domain_arn}/*"]
             )
             )
     
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_opensearchservice/README.html#vpc-support
-
+        
+        
         s3_backup_bucket = s3.Bucket(
             self,
             "OpenSearchDynamoDBIngestionBackupS3Bucket",
@@ -215,6 +255,7 @@ class DashboardStack(Stack):
         )
 
         
+        
         cloudwatch_logs_group = logs.LogGroup(
             self,
             "OpenSearchIngestionZeroETLPipelineLogGroup",
@@ -222,38 +263,6 @@ class DashboardStack(Stack):
             retention=logs.RetentionDays.ONE_MONTH,
             removal_policy=RemovalPolicy.DESTROY
         )
-
-        
-        #create the pipeline configuration
-        def generate_template(file, replace_value):
-            """
-                Function that reads a text file, replaces values according to a dictionary
-                of replacements, and returns the updated content as a string.
-
-                Args:
-                    ruta_archivo (str): The path of the text file.
-                    reemplazos (dict): A dictionary where the keys are the values to be
-                                    replaced and the values are the new values.
-
-                Returns:
-                    str: The content of the file with the replaced values.
-            """
-            try:
-                with open(file, 'r') as archivo:
-                    contenido = archivo.read()
-                    
-                    for clave, valor in replace_value.items():
-                        contenido = contenido.replace(clave, valor)
-                    # Convert the updated content to YAML format
-                    contenido_yaml = yaml.dump(contenido)
-                    return contenido_yaml
-        
-            except FileNotFoundError:
-                print(f"El archivo {file} no existe.")
-                return None
-            except IOError:
-                print(f"Error al leer el archivo {file}.")
-                return None
 
         replace_value = {
                 "REGION_NAME": str(REGION_NAME),
@@ -263,8 +272,9 @@ class DashboardStack(Stack):
                 "OpenSearch_DOMAIN":str(opensearch_domain.domain_endpoint),
                 }
 
-        """
         pipeline_configuration_body = generate_template(file, replace_value)
+        print(pipeline_configuration_body)
+
 
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_osis/CfnPipeline.html
 
@@ -282,4 +292,5 @@ class DashboardStack(Stack):
                                                 CfnTag(key="Description", value="OpenSearch Ingestion Zero ETL Pipeline")
                                             ]
                                         )
-        """
+        #Sets the deletion policy of the resource based on the removal policy DESTROY
+        cfn_pipeline.apply_removal_policy(RemovalPolicy.DESTROY)
