@@ -1,4 +1,4 @@
-version: "2"
+version: "1"
 dynamodb-pipeline:
   source:
     dynamodb:
@@ -27,7 +27,7 @@ dynamodb-pipeline:
         # REQUIRED: Provide an AWS OpenSearch endpoint
         hosts:
           [
-            "OpenSearch_DOMAIN"
+            "https://OpenSearch_DOMAIN"
           ]
         index: "table-index"
         index_type: custom
@@ -40,19 +40,4 @@ dynamodb-pipeline:
           sts_role_arn: "STS_ROLE_ARN"
           # Provide the region of the domain.
           region: "REGION_NAME"
-          # Enable the 'serverless' flag if the sink is an Amazon OpenSearch Serverless collection
-          # serverless: true
-          # serverless_options:
-          # Specify a name here to create or update network policy for the serverless collection
-          # network_policy_name: "network-policy-name"
-          # Enable the S3 DLQ to capture any failed requests in an S3 bucket. This is recommended as a best practice for all pipelines.
-          # dlq:
-          # s3:
-          # Provide an S3 bucket
-          # bucket: "your-dlq-bucket-name"
-          # Provide a key path prefix for the failed requests
-          # key_path_prefix: "dynamodb-pipeline/dlq"
-          # Provide the region of the bucket.
-          # region: "us-east-1"
-          # Provide a Role ARN with access to the bucket. This role should have a trust relationship with osis-pipelines.amazonaws.com
-          # sts_role_arn: "arn:aws:iam::123456789012:role/Example-Role"
+         

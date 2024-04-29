@@ -74,32 +74,58 @@ class DashboardStack(Stack):
         # Use the ref attribute to get the identity pool ID
         identity_pool_id = cognito_identity_pool.ref
 
+        auth_role = iam.Role(self, "authRoleIdentity", 
+            assumed_by = iam.FederatedPrincipal(
+                federated = 'cognito-identity.amazonaws.com',
+                conditions = {
+                    "StringEquals": { "cognito-identity.amazonaws.com:aud": identity_pool_id },
+                    "ForAnyValue:StringLike": { "cognito-identity.amazonaws.com:amr": "authenticated" }
+                },
+                assume_role_action= "sts:AssumeRoleWithWebIdentity"
+            )
+        )
+
+        # Crea una política de acceso
+        auth_policy = iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=[
+                "cognito-identity:GetCredentialsForIdentity",
+            ],
+            resources=[
+                "*",
+            ]
+        )
+
+
+        # Add the required permissions to the access role
+        auth_role.add_to_policy(auth_policy)
+
         # Crea un rol de IAM para acceder al dominio de OpenSearch
         
         access_role = iam.Role(self, "OpenSearchAccessRoleZeroETL",
                        assumed_by=iam.ServicePrincipal("opensearchservice.amazonaws.com"),
                        managed_policies=[
-                           iam.ManagedPolicy.from_aws_managed_policy_name("AmazonOpenSearchServiceCognitoAccess")
-                       ])
+                           iam.ManagedPolicy.from_aws_managed_policy_name("AmazonOpenSearchServiceCognitoAccess"),
+                            iam.ManagedPolicy.from_aws_managed_policy_name("AmazonOpenSearchIngestionFullAccess"),
+                       iam.ManagedPolicy.from_aws_managed_policy_name("AmazonOpenSearchServiceFullAccess"),
+                            ]
+                            )
 
         # Crea una política de acceso
-
         access_policy = iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=[
-                "es:ESHttpGet",
-                "es:ESHttpPost",
-                "es:ESHttpPut",
-                "es:ESHttpDelete",
-                "ec2:DescribeVpcs",
+                "es:*",
             ],
             resources=[
-                f"arn:aws:es:{self.region}:{self.account}:domain/ZeroETLDashboard/*", 
-                ]
+                "*",
+            ]
         )
+        
         # Add the required permissions to the access role
         access_role.add_to_policy(access_policy)
-
+        
+      
         #create a Role with access to the opensearch domain, assume that has the necessary permissions to DynamoDB, OpenSearch, and S3. This role should have a trust relationship with osis-pipelines.amazonaws.com and opensearchservice.amazonaws.com
         sts_role = iam.Role(self, "OpenSearchIngestionRoleZeroETL",
                    assumed_by=iam.CompositePrincipal(
@@ -116,8 +142,8 @@ class DashboardStack(Stack):
 
 
         # Importar una VPC existente por su ID
-          #vpc_id = "vpc-0d815c4380ab00166"  # Reemplaza con el ID de tu VPC existente
-          #vpc = ec2.Vpc.from_lookup(self, "ImportedVPC", vpc_id=vpc_id, region="us-east-1")
+          #vpc_id = "vpc-xxx"  # Reemplaza con el ID de tu VPC existente
+          #vpc = ec2.Vpc.from_lookup(self, "ImportedVPC", vpc_id=vpc_id, region=REGION_NAME)
 
         opensearch_domain = opensearch.Domain(self, "ZeroETLDashboardDemo",
                                    version=opensearch.EngineVersion.OPENSEARCH_1_3,
@@ -138,17 +164,26 @@ class DashboardStack(Stack):
 
                                      #vpc=vpc,
                                      #vpc_subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE)],
-                                   access_policies=[
-                                       access_policy
-                                   ],
-                                    cognito_dashboards_auth=opensearch.CognitoOptions(
-                                            user_pool_id=cognito_pool.user_pool_id,
+                                   
+                                   cognito_dashboards_auth=opensearch.CognitoOptions(
+                                           user_pool_id=cognito_pool.user_pool_id,
                                             identity_pool_id=identity_pool_id,
                                             role=access_role
                                         ),  
                                     removal_policy=RemovalPolicy.DESTROY
                                     )
+        
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_elasticsearch/README.html
+        opensearch_domain.add_access_policies(
+            iam.PolicyStatement(
+                actions=["es:*"],
+                effect=iam.Effect.ALLOW,
+                principals=[iam.AccountPrincipal(self.account), iam.ArnPrincipal(auth_role.role_arn)],
+                resources=[f"{opensearch_domain.domain_arn}/*"]
+            )
+            )
     
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_opensearchservice/README.html#vpc-support
 
         s3_backup_bucket = s3.Bucket(
             self,
@@ -179,20 +214,6 @@ class DashboardStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-       
-        """   
-        sts_role.add_to_policy(iam.PolicyStatement(
-                    effect=iam.Effect.ALLOW,
-                    actions=[
-                        "es:ESHttpGet",
-                        "es:ESHttpPost",
-                        "es:ESHttpPut",
-                        "es:ESHttpDelete"
-                    ],
-                    resources=[opensearch_domain.domain_arn + "/*"]
-                )
-                )
-        """
         
         cloudwatch_logs_group = logs.LogGroup(
             self,
@@ -224,9 +245,7 @@ class DashboardStack(Stack):
                     for clave, valor in replace_value.items():
                         contenido = contenido.replace(clave, valor)
                     # Convert the updated content to YAML format
-                    print(contenido)
                     contenido_yaml = yaml.dump(contenido)
-                    
                     return contenido_yaml
         
             except FileNotFoundError:
@@ -244,11 +263,12 @@ class DashboardStack(Stack):
                 "OpenSearch_DOMAIN":str(opensearch_domain.domain_endpoint),
                 }
 
+        """
         pipeline_configuration_body = generate_template(file, replace_value)
 
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_osis/CfnPipeline.html
 
-        cfn_pipeline = osis.CfnPipeline(self, "OpenSearchIngestionZeroETLPipeline",
+        cfn_pipeline = osis.CfnPipeline(self, "OpenSearchZeroETLPipeline",
                                         pipeline_name = "opensearch-dynamodb-etl",
                                         max_units=1,
                                         min_units=1,
@@ -262,3 +282,4 @@ class DashboardStack(Stack):
                                                 CfnTag(key="Description", value="OpenSearch Ingestion Zero ETL Pipeline")
                                             ]
                                         )
+        """
