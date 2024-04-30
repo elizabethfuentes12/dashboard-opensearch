@@ -51,8 +51,6 @@ def generate_template(file, replace_value):
         return None
     
 
-        
-
 class DashboardStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -224,7 +222,6 @@ class DashboardStack(Stack):
     
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_opensearchservice/README.html#vpc-support
         
-        
         s3_backup_bucket = s3.Bucket(
             self,
             "OpenSearchDynamoDBIngestionBackupS3Bucket",
@@ -254,7 +251,6 @@ class DashboardStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        
         
         cloudwatch_logs_group = logs.LogGroup(
             self,
