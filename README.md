@@ -1,6 +1,7 @@
-# OpenSearch Ingestion Zero ETL Pipeline
+# Real-time Data Ingestion with OpenSearch and Amazon DynamoDB: A Zero-ETL Pipeline
+### OpenSearch Zero-ETL Pipeline 
 
-Este repositorio contiene un stack de CDK que despliega una arquitectura de ingesta de datos en tiempo real utilizando Amazon OpenSearch y AWS DynamoDB. La arquitectura se basa en el servicio Amazon OpenSearch Ingestion (OSIS) para procesar y transformar los datos de forma eficiente.
+Este repositorio contiene un stack de CDK que despliega una arquitectura de ingesta de datos en tiempo real utilizando Amazon OpenSearch y Amazon DynamoDB. La arquitectura se basa en el servicio Amazon OpenSearch Ingestion (OSIS) para procesar y transformar los datos de forma eficiente.
 
 ## Componentes principales
 
@@ -17,6 +18,39 @@ Este repositorio contiene un stack de CDK que despliega una arquitectura de inge
 - **[Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html)**: Se configura un grupo de logs en CloudWatch para almacenar los registros generados por la pipeline de OpenSearch Ingestion.
 
 - **[OpenSearch Ingestion Pipeline](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ingestion.html)**: Es el componente central que define la pipeline de ingesta. Toma la configuración en formato YAML que especifica las fuentes, transformaciones y destino de los datos. Se establece la capacidad mínima y máxima de la pipeline. Se habilita el logging a CloudWatch.
+
+## Diagrama
+
+```mermaid
+graph LR
+    Cognito[Amazon Cognito]
+    IAM[AWS IAM Roles]
+    OpenSearch[Amazon OpenSearch]
+    S3[Amazon S3]
+    DynamoDB[Amazon DynamoDB]
+    CloudWatch[Amazon CloudWatch Logs]
+    Pipeline[OpenSearch Ingestion Pipeline]
+    
+    Cognito --> OpenSearch
+    IAM --> OpenSearch
+    IAM --> DynamoDB
+    IAM --> S3
+    DynamoDB --> Pipeline
+    Pipeline --> OpenSearch
+    Pipeline --> S3
+    Pipeline --> CloudWatch
+```
+
+En resumen, el diagrama muestra los siguientes componentes y sus relaciones:
+
+- Amazon Cognito autentica el acceso a OpenSearch.
+- Los roles de IAM permiten el acceso de OpenSearch Ingestion a DynamoDB, S3 y OpenSearch.
+- DynamoDB es la fuente de datos para la ingesta.
+- La OpenSearch Ingestion Pipeline procesa los datos desde DynamoDB hacia OpenSearch.
+- Los backups se almacenan en S3.
+- Los logs se envían a CloudWatch Logs.
+
+Si tienes alguna otra pregunta o necesitas más detalles, házmelo saber.
 
 ## Configuración
 
@@ -41,8 +75,15 @@ cdk destroy
 
 Esto eliminará todos los recursos aprovisionados de forma automática, ya que se ha configurado la política de borrado en `DESTROY` para los principales componentes.
 
+## Conclusión
+
+Este repositorio proporciona una solución completa y eficiente para implementar una arquitectura de ingesta de datos en tiempo real utilizando Amazon OpenSearch y Amazon DynamoDB. Al aprovechar el poder del stack de AWS CDK, se simplifica el proceso de despliegue y configuración, permitiendo a los usuarios centrarse en el análisis y la obtención de insights a partir de sus datos. La combinación de OpenSearch, DynamoDB y el servicio de ingesta de OpenSearch (OSIS) elimina la necesidad de complejos procesos ETL, lo que resulta en un pipeline de ingesta de datos más ágil y escalable. 
+
+En resumen, este repositorio es un recurso valioso para aquellos que buscan implementar una arquitectura de ingesta de datos en tiempo real de manera rápida y sencilla, aprovechando al máximo las capacidades de Amazon OpenSearch y DynamoDB.
+
 ## Más información
 
 - [Documentación Amazon OpenSearch Ingestion](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/osis.html)
 - [Guía de desarrollador de DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/)
 - [Documentación Amazon Cognito](https://docs.aws.amazon.com/cognito/latest/developerguide/)
+

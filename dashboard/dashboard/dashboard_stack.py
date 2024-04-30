@@ -136,9 +136,9 @@ class DashboardStack(Stack):
         auth_role_arn = auth_role.role_arn
        
 
-        #identity_pool_id = "us-west-2:3643d964-638e-49f4-90b1-7fb5b12a7bf7"
-        #cognito_user_pool_id = "us-west-2_UIly67Gb8"
-        #auth_role_arn = "arn:aws:iam::637423526459:role/amplify-wabamanager-staging-144653-authRole"
+        #identity_pool_id = "us-west-2:"
+        #cognito_user_pool_id = "us-west-..."
+        #auth_role_arn = "arn:aws:iam::...:role/..."
 
         # Crea un rol de IAM para acceder al dominio de OpenSearch
         
