@@ -41,7 +41,7 @@ graph LR
     Pipeline --> CloudWatch
 ```
 
-En resumen, el diagrama muestra los siguientes componentes y sus relaciones:
+El diagrama muestra los siguientes componentes y sus relaciones:
 
 - Amazon Cognito autentica el acceso a OpenSearch.
 - Los roles de IAM permiten el acceso de OpenSearch Ingestion a DynamoDB, S3 y OpenSearch.
@@ -49,8 +49,6 @@ En resumen, el diagrama muestra los siguientes componentes y sus relaciones:
 - La OpenSearch Ingestion Pipeline procesa los datos desde DynamoDB hacia OpenSearch.
 - Los backups se almacenan en S3.
 - Los logs se envían a CloudWatch Logs.
-
-Si tienes alguna otra pregunta o necesitas más detalles, házmelo saber.
 
 ## Configuración
 
